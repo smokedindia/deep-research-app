@@ -1,0 +1,27 @@
+{
+  "name": "deep-research-agent",
+  "version": "2.0.0",
+  "description": "CLI app with Puppeteer browser automation and Ollama for autonomous deep research",
+  "main": "cli.js",
+  "scripts": {
+    "start": "node cli.js",
+    "research": "node cli.js"
+  },
+  "keywords": [
+    "puppeteer",
+    "ollama",
+    "research",
+    "ai",
+    "web-scraping",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "chalk": "^4.1.2",
+    "dotenv": "^17.2.3",
+    "marked": "^11.0.0",
+    "puppeteer": "^24.36.0"
+  }
+}

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deep Research Agent</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Marked library for Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+  <div class="control-panel">
+    <!-- Header -->
+    <div class="header">
+      <h1>🔬 Deep Research Agent</h1>
+      <div class="status-indicator">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Ready</span>
+      </div>
+    </div>
+
+    <!-- Search Controls -->
+    <div class="search-section">
+      <div class="input-group">
+        <input type="text" id="queryInput" placeholder="Enter your research query..." autocomplete="off" />
+        <button id="startBtn" class="btn btn-primary">
+          <span class="btn-icon">▶</span>
+          Start Research
+        </button>
+        <button id="stopBtn" class="btn btn-danger" disabled>
+          <span class="btn-icon">■</span>
+          Stop
+        </button>
+      </div>
+
+      <div class="custom-instructions">
+        <textarea id="customInstructions"
+          placeholder="Custom instructions (optional): e.g., 'Focus on academic papers after 2020', 'Only Google Scholar', 'Prefer technical documentation'..."
+          rows="2"></textarea>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="activity">Activity Log</button>
+      <button class="tab" data-tab="report">Report</button>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+      <!-- Activity Log Tab -->
+      <div id="activityTab" class="tab-pane active">
+        <div class="activity-log" id="activityLog">
+          <div class="log-entry log-info">
+            <span class="log-time">--:--:--</span>
+            <span class="log-message">Ready to start research. Enter a query and click Start.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Report Tab -->
+      <div id="reportTab" class="tab-pane">
+        <div class="report-actions">
+          <button id="exportBtn" class="btn btn-secondary" disabled>
+            <span class="btn-icon">💾</span>
+            Export Report
+          </button>
+        </div>
+        <div class="report-content" id="reportContent">
+          <div class="empty-state">
+            <p>No report yet. Start a research to generate a report.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+
+</html>
