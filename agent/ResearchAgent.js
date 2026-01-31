@@ -25,6 +25,7 @@ class ResearchAgent {
         this.collectedInfo = [];
         this.query = query;
         this.customInstructions = customInstructions;
+        this.startTime = Date.now();
 
         try {
             this.updateStatus('Initializing research agent...');
@@ -46,8 +47,15 @@ class ResearchAgent {
 
             this.updateStatus(`Executing research plan with ${plan.searches.length} search queries...`);
 
-            // Execute searches
+            // Execute searches with timeout protection
             for (let i = 0; i < plan.searches.length && this.isRunning; i++) {
+                // Check if we've exceeded max research time
+                if (Date.now() - this.startTime > config.research.maxResearchTime) {
+                    console.log('[Agent] Maximum research time exceeded, finishing early');
+                    this.updateStatus('Research time limit reached, generating report with collected data...', 'warning');
+                    break;
+                }
+
                 try {
                     const searchQuery = plan.searches[i];
                     // Pass the full directive as context

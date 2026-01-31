@@ -124,6 +124,32 @@ function promptForInstructions() {
 }
 
 /**
+ * Validate and sanitize research query
+ * @param {string} query - The raw query string
+ * @returns {string} Sanitized query
+ */
+function validateQuery(query) {
+    if (!query || typeof query !== 'string') {
+        throw new Error('Query must be a non-empty string');
+    }
+
+    const sanitized = query.trim();
+    
+    if (sanitized.length === 0) {
+        throw new Error('Query cannot be empty');
+    }
+    
+    if (sanitized.length > 500) {
+        throw new Error('Query is too long (max 500 characters)');
+    }
+    
+    // Remove potentially dangerous characters while keeping the query readable
+    const cleaned = sanitized.replace(/[<>]/g, '');
+    
+    return cleaned;
+}
+
+/**
  * Main function
  */
 async function main() {
@@ -138,8 +164,11 @@ async function main() {
             query = await promptForQuery();
         }
 
-        if (!query || query.trim() === '') {
-            console.log(chalk.red('❌ No query provided. Exiting.'));
+        // Validate and sanitize query
+        try {
+            query = validateQuery(query);
+        } catch (validationError) {
+            console.log(chalk.red(`❌ Invalid query: ${validationError.message}`));
             process.exit(1);
         }
 

@@ -9,6 +9,7 @@ class OllamaService {
         this.timeout = config.ollama.timeout;
         this.bearerToken = config.ollama.bearerToken;
         this.cache = new Map(); // Add response cache
+        this.maxCacheSize = 100; // Limit cache size to prevent memory issues
     }
 
     /**
@@ -16,6 +17,33 @@ class OllamaService {
      */
     getCacheKey(prompt, options = {}) {
         return `${options.model || this.model}:${prompt}`;
+    }
+
+    /**
+     * Retry helper for network operations
+     * @param {Function} operation - The async operation to retry
+     * @param {number} maxRetries - Maximum number of retries
+     * @param {number} delay - Delay between retries in ms
+     * @returns {Promise} Result of the operation
+     */
+    async retryOperation(operation, maxRetries = 3, delay = 1000) {
+        let lastError;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                return await operation();
+            } catch (error) {
+                lastError = error;
+                console.log(`[OllamaService] Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+                
+                if (attempt < maxRetries) {
+                    console.log(`[OllamaService] Retrying in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    // Exponential backoff
+                    delay *= 2;
+                }
+            }
+        }
+        throw lastError;
     }
 
     /**
@@ -29,7 +57,7 @@ class OllamaService {
             return this.cache.get(cacheKey);
         }
 
-        try {
+        return await this.retryOperation(async () => {
             const headers = {
                 'Content-Type': 'application/json'
             };
@@ -54,17 +82,23 @@ class OllamaService {
             );
 
             const result = response.data.response;
-            // Cache the response
+            // Cache the response with size limit
+            if (this.cache.size >= this.maxCacheSize) {
+                // Remove oldest entry (first entry in Map)
+                const firstKey = this.cache.keys().next().value;
+                this.cache.delete(firstKey);
+                console.log('[OllamaService] Cache full, removed oldest entry');
+            }
             this.cache.set(cacheKey, result);
             console.log(`[OllamaService] Cached response (cache size: ${this.cache.size})`);
 
             return result;
-        } catch (error) {
+        }, 3, 1000).catch(error => {
             if (error.code === 'ECONNREFUSED') {
                 throw new Error('Cannot connect to Ollama. Make sure Ollama is running (ollama serve)');
             }
             throw new Error(`Ollama error: ${error.message}`);
-        }
+        });
     }
 
     /**
