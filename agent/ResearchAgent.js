@@ -25,6 +25,20 @@ class ResearchAgent {
     }
 
     /**
+     * Validate if a URL is well-formed
+     * @param {string} url - The URL to validate
+     * @returns {boolean} True if URL is valid
+     */
+    isValidUrl(url) {
+        try {
+            new URL(url);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
      * Start the research process
      * @param {string} query - The research query
      * @param {string} customInstructions - Optional custom instructions
@@ -321,16 +335,10 @@ Respond with JSON containing the selected URLs. IMPORTANT: Only select URLs from
             console.log('[Agent] Ollama link selection result:', result);
             if (result.selectedUrls && result.selectedUrls.length > 0) {
                 // Filter out any hallucinated URLs that aren't in the original list
-                // Also validate URLs
-                const validUrls = result.selectedUrls.filter(url => {
-                    if (!links.includes(url)) return false;
-                    try {
-                        new URL(url);
-                        return true;
-                    } catch {
-                        return false;
-                    }
-                });
+                // Also validate URLs using utility method
+                const validUrls = result.selectedUrls.filter(url => 
+                    links.includes(url) && this.isValidUrl(url)
+                );
                 if (validUrls.length > 0) {
                     return validUrls;
                 }

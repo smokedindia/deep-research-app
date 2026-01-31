@@ -166,7 +166,16 @@ function validateQuery(query) {
     }
     
     // Remove potentially dangerous characters while keeping the query readable
-    const cleaned = sanitized.replace(/[<>]/g, '');
+    // Remove: angle brackets, semicolons, pipes, ampersands, null bytes, path traversal
+    const cleaned = sanitized
+        .replace(/[<>;|&\0]/g, '')
+        .replace(/\.\.\//g, '')
+        .replace(/\.\.\\/g, '')
+        .trim();
+    
+    if (cleaned.length === 0) {
+        throw new Error('Query contains only invalid characters');
+    }
     
     return cleaned;
 }

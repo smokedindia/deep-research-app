@@ -151,7 +151,7 @@ class PuppeteerBrowserController {
 
     /**
      * Extract text content from the current page
-     * @returns {Promise<string>} The page text content
+     * @returns {Promise<string>} The page text content, or empty string on error
      */
     async extractContent() {
         if (!this.page) {
@@ -183,7 +183,7 @@ class PuppeteerBrowserController {
 
     /**
      * Extract links from the current page (search results)
-     * @returns {Promise<string[]>} Array of URLs
+     * @returns {Promise<string[]>} Array of URLs, or empty array on error
      */
     async extractLinks() {
         if (!this.page) {

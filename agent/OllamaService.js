@@ -17,7 +17,7 @@ class OllamaService {
         this.temperature = config.ollama.temperature;
         this.timeout = config.ollama.timeout;
         this.bearerToken = config.ollama.bearerToken;
-        this.cache = new Map(); // Add response cache
+        this.cache = new Map(); // Add response cache - Map maintains insertion order
         this.maxCacheSize = 100; // Limit cache size to prevent memory issues
     }
 
@@ -29,6 +29,37 @@ class OllamaService {
      */
     getCacheKey(prompt, options = {}) {
         return `${options.model || this.model}:${prompt}`;
+    }
+
+    /**
+     * Get from cache and update access time (LRU)
+     * @param {string} key - Cache key
+     * @returns {string|undefined} Cached value or undefined
+     */
+    getFromCache(key) {
+        if (!this.cache.has(key)) {
+            return undefined;
+        }
+        // Move to end (most recently used) by deleting and re-adding
+        const value = this.cache.get(key);
+        this.cache.delete(key);
+        this.cache.set(key, value);
+        return value;
+    }
+
+    /**
+     * Add to cache with LRU eviction
+     * @param {string} key - Cache key
+     * @param {string} value - Value to cache
+     */
+    addToCache(key, value) {
+        // If at capacity, remove least recently used (first item)
+        if (this.cache.size >= this.maxCacheSize) {
+            const firstKey = this.cache.keys().next().value;
+            this.cache.delete(firstKey);
+            console.log('[OllamaService] Cache full, evicted least recently used entry');
+        }
+        this.cache.set(key, value);
     }
 
     /**
@@ -62,11 +93,12 @@ class OllamaService {
      * Generate a completion from Ollama
      */
     async generateCompletion(prompt, options = {}) {
-        // Check cache first
+        // Check cache first with LRU
         const cacheKey = this.getCacheKey(prompt, options);
-        if (this.cache.has(cacheKey)) {
+        const cachedValue = this.getFromCache(cacheKey);
+        if (cachedValue) {
             console.log('[OllamaService] Cache HIT for prompt');
-            return this.cache.get(cacheKey);
+            return cachedValue;
         }
 
         return await this.retryOperation(async () => {
@@ -94,14 +126,8 @@ class OllamaService {
             );
 
             const result = response.data.response;
-            // Cache the response with size limit
-            if (this.cache.size >= this.maxCacheSize) {
-                // Remove oldest entry (first entry in Map)
-                const firstKey = this.cache.keys().next().value;
-                this.cache.delete(firstKey);
-                console.log('[OllamaService] Cache full, removed oldest entry');
-            }
-            this.cache.set(cacheKey, result);
+            // Cache the response with LRU eviction
+            this.addToCache(cacheKey, result);
             console.log(`[OllamaService] Cached response (cache size: ${this.cache.size})`);
 
             return result;
