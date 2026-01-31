@@ -1,7 +1,16 @@
+/**
+ * Ollama Service - Interface for Ollama LLM API
+ * Provides methods for generating completions, JSON responses, and connection management
+ * Includes caching and retry logic for reliability
+ */
+
 const axios = require('axios');
 const config = require('../config');
 
 class OllamaService {
+    /**
+     * Create an OllamaService instance
+     */
     constructor() {
         this.host = config.ollama.host;
         this.model = config.ollama.model;
@@ -13,7 +22,10 @@ class OllamaService {
     }
 
     /**
-     * Generate cache key from prompt
+     * Generate cache key from prompt and options
+     * @param {string} prompt - The prompt text
+     * @param {Object} options - Generation options
+     * @returns {string} Cache key
      */
     getCacheKey(prompt, options = {}) {
         return `${options.model || this.model}:${prompt}`;
@@ -103,6 +115,10 @@ class OllamaService {
 
     /**
      * Generate a structured JSON response with better error handling
+     * @param {string} prompt - The prompt requesting JSON output
+     * @param {Object} options - Generation options
+     * @returns {Promise<Object>} Parsed JSON response
+     * @throws {Error} If response is not valid JSON
      */
     async generateJSON(prompt, options = {}) {
         const fullPrompt = `${prompt}\n\nIMPORTANT: Respond with ONLY valid JSON. Do not include any text before or after the JSON object. Ensure all strings are properly quoted.`;
@@ -138,7 +154,8 @@ class OllamaService {
     }
 
     /**
-     * Test connection to Ollama
+     * Test connection to Ollama server
+     * @returns {Promise<boolean>} True if connection successful
      */
     async testConnection() {
         try {
@@ -168,7 +185,8 @@ class OllamaService {
     }
 
     /**
-     * Get list of available models
+     * Get list of available models from Ollama
+     * @returns {Promise<string[]>} Array of model names
      */
     async listModels() {
         try {

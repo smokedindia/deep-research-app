@@ -1,7 +1,18 @@
+/**
+ * Autonomous Research Agent
+ * Uses AI (Ollama) to plan and execute comprehensive web research
+ * using browser automation (Puppeteer)
+ */
+
 const OllamaService = require('./OllamaService');
 const config = require('../config');
 
 class ResearchAgent {
+    /**
+     * Create a new ResearchAgent instance
+     * @param {PuppeteerBrowserController} browserController - Browser controller instance
+     * @param {Function} statusCallback - Callback function for status updates
+     */
     constructor(browserController, statusCallback) {
         this.ollama = new OllamaService();
         this.browser = browserController;
@@ -101,7 +112,10 @@ class ResearchAgent {
     }
 
     /**
-     * NEW: Enrich the user query into a detailed research directive
+     * Enrich the user query into a detailed research directive
+     * Uses AI to expand a simple query into comprehensive research goals
+     * @param {string} query - The original user query
+     * @returns {Promise<string>} Enriched research directive
      */
     async enrichQuery(query) {
         const customContext = this.customInstructions ? `\nUsers custom instructions: ${this.customInstructions}` : '';
@@ -128,6 +142,9 @@ Output a single paragraph comprehensively describing what the research agent sho
 
     /**
      * Plan the research strategy using Ollama
+     * Breaks down the research directive into specific search queries
+     * @param {string} directive - The research directive
+     * @returns {Promise<Object>} Research plan with array of search queries
      */
     async planResearch(directive) {
         const customContext = this.customInstructions ? `\nAdhere to these custom instructions: ${this.customInstructions}` : '';
@@ -152,10 +169,11 @@ Create a research plan. Respond with JSON in this exact format:
     }
 
     /**
-     * Perform a search and explore results
-     */
-    /**
-     * Perform a search and explore results
+     * Perform a search and explore results recursively
+     * @param {string} searchQuery - The search query to execute
+     * @param {number} depth - Current recursion depth
+     * @param {string} context - Research context for relevance scoring
+     * @returns {Promise<void>}
      */
     async performSearch(searchQuery, depth, context) {
         if (!this.isRunning || depth >= config.research.maxDepth) {
@@ -259,7 +277,11 @@ Create a research plan. Respond with JSON in this exact format:
     }
 
     /**
-     * Use Ollama to select most relevant links
+     * Use Ollama to select most relevant links from search results
+     * Filters links to avoid redundancy and maximize information gain
+     * @param {string[]} links - Array of URLs to evaluate
+     * @param {string} query - The search query for context
+     * @returns {Promise<string[]>} Selected relevant URLs
      */
     async selectRelevantLinks(links, query) {
         const customContext = this.customInstructions ? `\nAdhere to these custom instructions: ${this.customInstructions}` : '';
@@ -302,6 +324,11 @@ Respond with JSON containing the selected URLs. IMPORTANT: Only select URLs from
 
     /**
      * Visit a page by clicking on its link physically (instead of direct navigation)
+     * Extracts content and explores deeper links if depth allows
+     * @param {string} url - The URL to visit
+     * @param {string} context - Research context
+     * @param {number} depth - Current recursion depth
+     * @returns {Promise<void>}
      */
     async visitPage(url, context, depth) {
         if (this.visitedUrls.has(url) || !this.isRunning) {
@@ -411,7 +438,11 @@ Respond with JSON containing the selected URLs. IMPORTANT: Only select URLs from
     }
 
     /**
-     * NEW: Explore clickable links within a page
+     * Explore clickable links within a page recursively
+     * @param {string} currentUrl - The current page URL
+     * @param {string} context - Research context
+     * @param {number} depth - Current recursion depth
+     * @returns {Promise<void>}
      */
     async explorePageLinks(currentUrl, context, depth) {
         try {
@@ -454,7 +485,10 @@ Respond with JSON containing the selected URLs. IMPORTANT: Only select URLs from
     }
 
     /**
-     * Use Ollama to select informative links from clickable elements
+     * Use Ollama to select informative links from clickable elements on a page
+     * @param {Array<{text: string, url: string}>} clickables - Array of clickable elements
+     * @param {string} query - The research query for context
+     * @returns {Promise<Array<{text: string, url: string}>>} Selected informative links
      */
     async selectInformativeLinks(clickables, query) {
         const customContext = this.customInstructions ? `\nAdhere to these custom instructions: ${this.customInstructions}` : '';
@@ -493,6 +527,9 @@ Respond with JSON containing the link texts and URLs:
 
     /**
      * Extract relevant information from page content using Ollama
+     * @param {string} content - Raw page content
+     * @param {string} context - Research context
+     * @returns {Promise<string>} Extracted relevant information
      */
     async extractRelevantInfo(content, context) {
         // Truncate content to avoid overwhelming the LLM
@@ -519,7 +556,10 @@ Respond with just the extracted information as plain text, one insight per line.
     }
 
     /**
-     * NEW: Update global knowledge memory to prevent redundancy
+     * Update global knowledge memory to prevent redundancy
+     * Merges new information into existing knowledge summary
+     * @param {string} newInfo - New information to integrate
+     * @returns {Promise<void>}
      */
     async updateKnowledgeMemory(newInfo) {
         try {
@@ -546,7 +586,9 @@ Respond ONLY with the updated memory text.`;
     }
 
     /**
-     * Generate final research report
+     * Generate final research report from collected information
+     * Uses AI to synthesize findings into a comprehensive report
+     * @returns {Promise<Object>} Research report object
      */
     async generateReport() {
         console.log(`[Agent] Generating report with ${this.collectedInfo.length} sources`);
@@ -602,6 +644,7 @@ Make it comprehensive but concise. Use proper Markdown formatting.`;
 
     /**
      * Generate a simple fallback report if Ollama fails
+     * @returns {string} Markdown formatted report
      */
     generateFallbackReport() {
         let report = `# Research Report: ${this.query}\n\n`;
@@ -624,7 +667,9 @@ Make it comprehensive but concise. Use proper Markdown formatting.`;
     }
 
     /**
-     * Update status
+     * Update status and notify via callback
+     * @param {string} message - Status message
+     * @param {string} type - Status type ('info', 'error', 'warning', 'success')
      */
     updateStatus(message, type = 'info') {
         console.log(`[Agent] ${message}`);
@@ -634,7 +679,9 @@ Make it comprehensive but concise. Use proper Markdown formatting.`;
     }
 
     /**
-     * Wait helper
+     * Wait helper utility
+     * @param {number} ms - Milliseconds to wait
+     * @returns {Promise<void>}
      */
     wait(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));

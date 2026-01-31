@@ -1,3 +1,9 @@
+/**
+ * Deep Research Agent - CLI Entry Point
+ * Provides an interactive command-line interface for autonomous web research
+ * using Puppeteer browser automation and Ollama AI.
+ */
+
 #!/usr/bin/env node
 
 // Load environment variables from .env file
@@ -30,6 +36,10 @@ console.log(chalk.bold.cyan('\n🔬 Deep Research Agent - External Browser Editi
 
 /**
  * Status callback for research agent
+ * @param {Object} status - Status object containing message, type, and timestamp
+ * @param {string} status.message - Status message to display
+ * @param {string} status.type - Status type ('error', 'warning', 'success', or 'info')
+ * @param {string} status.timestamp - ISO timestamp
  */
 function statusCallback(status) {
     const timestamp = new Date().toLocaleTimeString();
@@ -51,7 +61,10 @@ function statusCallback(status) {
 }
 
 /**
- * Save report to file
+ * Save report to file with timestamp
+ * @param {Object} report - The research report object
+ * @param {string} report.content - The markdown content of the report
+ * @returns {string} The filepath where the report was saved
  */
 function saveReport(report) {
     const timestamp = Date.now();
@@ -65,7 +78,12 @@ function saveReport(report) {
 }
 
 /**
- * Display report summary
+ * Display report summary in terminal
+ * @param {Object} report - The research report object
+ * @param {string} report.query - The research query
+ * @param {number} report.sourcesCount - Number of sources collected
+ * @param {string} report.timestamp - ISO timestamp
+ * @param {string} report.content - Report content
  */
 function displayReportSummary(report) {
     console.log(chalk.bold.cyan('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
@@ -89,7 +107,8 @@ function displayReportSummary(report) {
 }
 
 /**
- * Prompt user for research query
+ * Prompt user for research query via interactive input
+ * @returns {Promise<string>} The user's research query
  */
 function promptForQuery() {
     return new Promise((resolve) => {
@@ -107,6 +126,7 @@ function promptForQuery() {
 
 /**
  * Prompt for custom instructions (optional)
+ * @returns {Promise<string>} The user's custom instructions or empty string
  */
 function promptForInstructions() {
     return new Promise((resolve) => {
@@ -125,8 +145,10 @@ function promptForInstructions() {
 
 /**
  * Validate and sanitize research query
+ * Ensures the query is safe and meets basic requirements
  * @param {string} query - The raw query string
  * @returns {string} Sanitized query
+ * @throws {Error} If query is invalid
  */
 function validateQuery(query) {
     if (!query || typeof query !== 'string') {
@@ -150,7 +172,8 @@ function validateQuery(query) {
 }
 
 /**
- * Main function
+ * Main function - Orchestrates the research workflow
+ * Handles initialization, query processing, research execution, and cleanup
  */
 async function main() {
     let browserController = null;

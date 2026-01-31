@@ -1,3 +1,9 @@
+/**
+ * Puppeteer Browser Controller
+ * Provides browser automation capabilities using Puppeteer
+ * with physical mouse/keyboard interactions for more human-like behavior
+ */
+
 const puppeteer = require('puppeteer');
 const config = require('../config');
 
@@ -5,13 +11,17 @@ const config = require('../config');
  * Browser controller using Puppeteer for visible, physical browser automation
  */
 class PuppeteerBrowserController {
+    /**
+     * Create a new PuppeteerBrowserController instance
+     */
     constructor() {
         this.browser = null;
         this.page = null;
     }
 
     /**
-     * Launch the browser instance
+     * Launch the browser instance with configured settings
+     * @returns {Promise<void>}
      */
     async launch() {
         console.log('[BrowserController] Launching visible Chrome/Chromium browser...');
@@ -224,6 +234,8 @@ class PuppeteerBrowserController {
 
     /**
      * Scroll the page smoothly using mouse wheel
+     * Scrolls to middle of page for dynamic content loading
+     * @returns {Promise<void>}
      */
     async scrollPage() {
         if (!this.page) {
@@ -259,8 +271,8 @@ class PuppeteerBrowserController {
 
     /**
      * Click an element by selector using physical mouse click
-     * @param {string} selector - CSS selector
-     * @returns {Promise<boolean>} True if successful
+     * @param {string} selector - CSS selector for element to click
+     * @returns {Promise<boolean>} True if successful, false otherwise
      */
     async clickElement(selector) {
         if (!this.page) {
@@ -288,8 +300,8 @@ class PuppeteerBrowserController {
 
     /**
      * Click a link by its text content using physical mouse
-     * @param {string} text - Text to search for in links
-     * @returns {Promise<boolean>} True if successful
+     * @param {string} text - Text to search for in link elements
+     * @returns {Promise<boolean>} True if successful, false otherwise
      */
     async clickLinkByText(text) {
         if (!this.page) {
@@ -322,7 +334,8 @@ class PuppeteerBrowserController {
 
     /**
      * Extract clickable elements from the current page
-     * @returns {Promise<Array>} Array of clickable elements with text and URL
+     * Filters out navigation and irrelevant links
+     * @returns {Promise<Array<{text: string, url: string, type: string}>>} Array of clickable elements
      */
     async extractClickableElements() {
         if (!this.page) {
@@ -365,7 +378,8 @@ class PuppeteerBrowserController {
     }
 
     /**
-     * Close the browser
+     * Close the browser instance
+     * @returns {Promise<void>}
      */
     async close() {
         if (this.browser) {
@@ -378,6 +392,8 @@ class PuppeteerBrowserController {
 
     /**
      * Handle CAPTCHA challenges (e.g., "I'm not a robot")
+     * Attempts to detect and interact with reCAPTCHA
+     * @returns {Promise<boolean>} True if CAPTCHA was found and handled
      */
     async handleCaptcha() {
         try {
