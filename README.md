@@ -38,7 +38,32 @@ A CLI-based autonomous research assistant that uses **Puppeteer** to physically 
 
 ## Configuration
 
-Edit `config.js` to customize:
+Configuration can be done through either:
+1. **Environment variables** (recommended) - Copy `.env.example` to `.env` and customize
+2. **Direct editing** - Edit `config.js` to customize defaults
+
+### Environment Variables
+
+The following environment variables are supported:
+
+**Ollama Settings:**
+- `OLLAMA_HOST` - Ollama server host (default: `http://127.0.0.1:11434`)
+- `OLLAMA_MODEL` - Model to use (default: `llama3.2:3b`)
+- `OLLAMA_TEMPERATURE` - Temperature for generation (default: `0.7`)
+- `OLLAMA_TIMEOUT` - Request timeout in ms (default: `120000`)
+- `OLLAMA_BEARER_TOKEN` - Optional bearer token for authentication
+
+**Research Parameters:**
+- `RESEARCH_MAX_DEPTH` - How many levels deep to explore (default: `3`)
+- `RESEARCH_MAX_PAGES` - How many pages to visit per level (default: `3`)
+- `RESEARCH_PAGE_TIMEOUT` - Timeout per page in ms (default: `30000`)
+- `RESEARCH_SCROLL_DELAY` - Wait time after scrolling in ms (default: `2000`)
+- `RESEARCH_MAX_TIME` - Maximum total research time in ms (default: `600000`)
+- `RESEARCH_SEARCH_ENGINE` - Search engine URL (default: `https://www.google.com/search?q=`)
+
+### Configuration File
+
+Edit `config.js` to customize default values for:
 
 - **Ollama settings**: Change the model, temperature, host
 - **Research parameters**: Adjust search depth, pages per level, timeouts

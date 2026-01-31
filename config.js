@@ -1,18 +1,19 @@
 module.exports = {
   ollama: {
-    host: 'http://158.179.163.136', // Use 127.0.0.1 instead of localhost to force IPv4
-    model: 'gpt-oss:latest',
-    temperature: 0.7,
-    timeout: 120000, // 2 minutes
+    host: process.env.OLLAMA_HOST || 'http://127.0.0.1:11434',
+    model: process.env.OLLAMA_MODEL || 'llama3.2:3b',
+    temperature: parseFloat(process.env.OLLAMA_TEMPERATURE || '0.7'),
+    timeout: parseInt(process.env.OLLAMA_TIMEOUT || '120000', 10), // 2 minutes
     bearerToken: process.env.OLLAMA_BEARER_TOKEN || '' // Optional bearer token for authentication
   },
 
   research: {
-    maxDepth: 3, // How many levels deep to explore
-    maxPagesPerLevel: 3, // How many pages to visit per level
-    pageTimeout: 30000, // 30 seconds per page
-    scrollDelay: 2000, // Wait 2s after scrolling to let content load
-    searchEngine: 'https://www.google.com/search?q='
+    maxDepth: parseInt(process.env.RESEARCH_MAX_DEPTH || '3', 10), // How many levels deep to explore
+    maxPagesPerLevel: parseInt(process.env.RESEARCH_MAX_PAGES || '3', 10), // How many pages to visit per level
+    pageTimeout: parseInt(process.env.RESEARCH_PAGE_TIMEOUT || '30000', 10), // 30 seconds per page
+    scrollDelay: parseInt(process.env.RESEARCH_SCROLL_DELAY || '2000', 10), // Wait 2s after scrolling to let content load
+    searchEngine: process.env.RESEARCH_SEARCH_ENGINE || 'https://www.google.com/search?q=',
+    maxResearchTime: parseInt(process.env.RESEARCH_MAX_TIME || '600000', 10) // 10 minutes max total research time
   },
 
   puppeteer: {

@@ -1,3 +1,9 @@
+/**
+ * Deep Research Agent - CLI Entry Point
+ * Provides an interactive command-line interface for autonomous web research
+ * using Puppeteer browser automation and Ollama AI.
+ */
+
 #!/usr/bin/env node
 
 // Load environment variables from .env file
@@ -30,6 +36,10 @@ console.log(chalk.bold.cyan('\n🔬 Deep Research Agent - External Browser Editi
 
 /**
  * Status callback for research agent
+ * @param {Object} status - Status object containing message, type, and timestamp
+ * @param {string} status.message - Status message to display
+ * @param {string} status.type - Status type ('error', 'warning', 'success', or 'info')
+ * @param {string} status.timestamp - ISO timestamp
  */
 function statusCallback(status) {
     const timestamp = new Date().toLocaleTimeString();
@@ -51,7 +61,10 @@ function statusCallback(status) {
 }
 
 /**
- * Save report to file
+ * Save report to file with timestamp
+ * @param {Object} report - The research report object
+ * @param {string} report.content - The markdown content of the report
+ * @returns {string} The filepath where the report was saved
  */
 function saveReport(report) {
     const timestamp = Date.now();
@@ -65,7 +78,12 @@ function saveReport(report) {
 }
 
 /**
- * Display report summary
+ * Display report summary in terminal
+ * @param {Object} report - The research report object
+ * @param {string} report.query - The research query
+ * @param {number} report.sourcesCount - Number of sources collected
+ * @param {string} report.timestamp - ISO timestamp
+ * @param {string} report.content - Report content
  */
 function displayReportSummary(report) {
     console.log(chalk.bold.cyan('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
@@ -89,7 +107,8 @@ function displayReportSummary(report) {
 }
 
 /**
- * Prompt user for research query
+ * Prompt user for research query via interactive input
+ * @returns {Promise<string>} The user's research query
  */
 function promptForQuery() {
     return new Promise((resolve) => {
@@ -107,6 +126,7 @@ function promptForQuery() {
 
 /**
  * Prompt for custom instructions (optional)
+ * @returns {Promise<string>} The user's custom instructions or empty string
  */
 function promptForInstructions() {
     return new Promise((resolve) => {
@@ -124,7 +144,45 @@ function promptForInstructions() {
 }
 
 /**
- * Main function
+ * Validate and sanitize research query
+ * Ensures the query is safe and meets basic requirements
+ * @param {string} query - The raw query string
+ * @returns {string} Sanitized query
+ * @throws {Error} If query is invalid
+ */
+function validateQuery(query) {
+    if (!query || typeof query !== 'string') {
+        throw new Error('Query must be a non-empty string');
+    }
+
+    const sanitized = query.trim();
+    
+    if (sanitized.length === 0) {
+        throw new Error('Query cannot be empty');
+    }
+    
+    if (sanitized.length > 500) {
+        throw new Error('Query is too long (max 500 characters)');
+    }
+    
+    // Remove potentially dangerous characters while keeping the query readable
+    // Remove: angle brackets, semicolons, pipes, ampersands, null bytes, path traversal
+    const cleaned = sanitized
+        .replace(/[<>;|&\0]/g, '')
+        .replace(/\.\.\//g, '')
+        .replace(/\.\.\\/g, '')
+        .trim();
+    
+    if (cleaned.length === 0) {
+        throw new Error('Query contains only invalid characters');
+    }
+    
+    return cleaned;
+}
+
+/**
+ * Main function - Orchestrates the research workflow
+ * Handles initialization, query processing, research execution, and cleanup
  */
 async function main() {
     let browserController = null;
@@ -138,8 +196,11 @@ async function main() {
             query = await promptForQuery();
         }
 
-        if (!query || query.trim() === '') {
-            console.log(chalk.red('❌ No query provided. Exiting.'));
+        // Validate and sanitize query
+        try {
+            query = validateQuery(query);
+        } catch (validationError) {
+            console.log(chalk.red(`❌ Invalid query: ${validationError.message}`));
             process.exit(1);
         }
 
@@ -165,6 +226,15 @@ async function main() {
 
         if (report.cancelled) {
             console.log(chalk.yellow('\n⚠️  Research was cancelled.'));
+        } else if (report.warning) {
+            // Display warning for empty or problematic reports
+            console.log(chalk.yellow(`\n⚠️  Warning: ${report.warning}\n`));
+            
+            // Display summary even for empty reports
+            displayReportSummary(report);
+
+            // Save report
+            saveReport(report);
         } else {
             // Display summary
             displayReportSummary(report);

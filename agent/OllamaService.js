@@ -1,35 +1,107 @@
+/**
+ * Ollama Service - Interface for Ollama LLM API
+ * Provides methods for generating completions, JSON responses, and connection management
+ * Includes caching and retry logic for reliability
+ */
+
 const axios = require('axios');
 const config = require('../config');
 
 class OllamaService {
+    /**
+     * Create an OllamaService instance
+     */
     constructor() {
         this.host = config.ollama.host;
         this.model = config.ollama.model;
         this.temperature = config.ollama.temperature;
         this.timeout = config.ollama.timeout;
         this.bearerToken = config.ollama.bearerToken;
-        this.cache = new Map(); // Add response cache
+        this.cache = new Map(); // Add response cache - Map maintains insertion order
+        this.maxCacheSize = 100; // Limit cache size to prevent memory issues
     }
 
     /**
-     * Generate cache key from prompt
+     * Generate cache key from prompt and options
+     * @param {string} prompt - The prompt text
+     * @param {Object} options - Generation options
+     * @returns {string} Cache key
      */
     getCacheKey(prompt, options = {}) {
         return `${options.model || this.model}:${prompt}`;
     }
 
     /**
+     * Get from cache and update access time (LRU)
+     * @param {string} key - Cache key
+     * @returns {string|undefined} Cached value or undefined
+     */
+    getFromCache(key) {
+        if (!this.cache.has(key)) {
+            return undefined;
+        }
+        // Move to end (most recently used) by deleting and re-adding
+        const value = this.cache.get(key);
+        this.cache.delete(key);
+        this.cache.set(key, value);
+        return value;
+    }
+
+    /**
+     * Add to cache with LRU eviction
+     * @param {string} key - Cache key
+     * @param {string} value - Value to cache
+     */
+    addToCache(key, value) {
+        // If at capacity, remove least recently used (first item)
+        if (this.cache.size >= this.maxCacheSize) {
+            const firstKey = this.cache.keys().next().value;
+            this.cache.delete(firstKey);
+            console.log('[OllamaService] Cache full, evicted least recently used entry');
+        }
+        this.cache.set(key, value);
+    }
+
+    /**
+     * Retry helper for network operations
+     * @param {Function} operation - The async operation to retry
+     * @param {number} maxRetries - Maximum number of retries
+     * @param {number} delay - Delay between retries in ms
+     * @returns {Promise} Result of the operation
+     */
+    async retryOperation(operation, maxRetries = 3, delay = 1000) {
+        let lastError;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                return await operation();
+            } catch (error) {
+                lastError = error;
+                console.log(`[OllamaService] Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+                
+                if (attempt < maxRetries) {
+                    console.log(`[OllamaService] Retrying in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    // Exponential backoff
+                    delay *= 2;
+                }
+            }
+        }
+        throw lastError;
+    }
+
+    /**
      * Generate a completion from Ollama
      */
     async generateCompletion(prompt, options = {}) {
-        // Check cache first
+        // Check cache first with LRU
         const cacheKey = this.getCacheKey(prompt, options);
-        if (this.cache.has(cacheKey)) {
+        const cachedValue = this.getFromCache(cacheKey);
+        if (cachedValue) {
             console.log('[OllamaService] Cache HIT for prompt');
-            return this.cache.get(cacheKey);
+            return cachedValue;
         }
 
-        try {
+        return await this.retryOperation(async () => {
             const headers = {
                 'Content-Type': 'application/json'
             };
@@ -54,21 +126,25 @@ class OllamaService {
             );
 
             const result = response.data.response;
-            // Cache the response
-            this.cache.set(cacheKey, result);
+            // Cache the response with LRU eviction
+            this.addToCache(cacheKey, result);
             console.log(`[OllamaService] Cached response (cache size: ${this.cache.size})`);
 
             return result;
-        } catch (error) {
+        }, 3, 1000).catch(error => {
             if (error.code === 'ECONNREFUSED') {
                 throw new Error('Cannot connect to Ollama. Make sure Ollama is running (ollama serve)');
             }
             throw new Error(`Ollama error: ${error.message}`);
-        }
+        });
     }
 
     /**
      * Generate a structured JSON response with better error handling
+     * @param {string} prompt - The prompt requesting JSON output
+     * @param {Object} options - Generation options
+     * @returns {Promise<Object>} Parsed JSON response
+     * @throws {Error} If response is not valid JSON
      */
     async generateJSON(prompt, options = {}) {
         const fullPrompt = `${prompt}\n\nIMPORTANT: Respond with ONLY valid JSON. Do not include any text before or after the JSON object. Ensure all strings are properly quoted.`;
@@ -104,7 +180,8 @@ class OllamaService {
     }
 
     /**
-     * Test connection to Ollama
+     * Test connection to Ollama server
+     * @returns {Promise<boolean>} True if connection successful
      */
     async testConnection() {
         try {
@@ -134,7 +211,8 @@ class OllamaService {
     }
 
     /**
-     * Get list of available models
+     * Get list of available models from Ollama
+     * @returns {Promise<string[]>} Array of model names
      */
     async listModels() {
         try {

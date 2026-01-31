@@ -1,3 +1,9 @@
+/**
+ * Puppeteer Browser Controller
+ * Provides browser automation capabilities using Puppeteer
+ * with physical mouse/keyboard interactions for more human-like behavior
+ */
+
 const puppeteer = require('puppeteer');
 const config = require('../config');
 
@@ -5,13 +11,17 @@ const config = require('../config');
  * Browser controller using Puppeteer for visible, physical browser automation
  */
 class PuppeteerBrowserController {
+    /**
+     * Create a new PuppeteerBrowserController instance
+     */
     constructor() {
         this.browser = null;
         this.page = null;
     }
 
     /**
-     * Launch the browser instance
+     * Launch the browser instance with configured settings
+     * @returns {Promise<void>}
      */
     async launch() {
         console.log('[BrowserController] Launching visible Chrome/Chromium browser...');
@@ -37,94 +47,111 @@ class PuppeteerBrowserController {
     /**
      * Navigate to a URL with physical search interaction for Google searches
      * @param {string} url - The URL to navigate to
+     * @param {number} retries - Number of retries for navigation (default: 2)
      */
-    async navigate(url) {
+    async navigate(url, retries = 2) {
         if (!this.page) {
             throw new Error('Browser not initialized. Call launch() first.');
         }
 
         console.log(`[BrowserController] Navigating to: ${url}`);
 
-        try {
-            // Check if this is a Google search URL
-            if (url.includes('google.com/search?q=')) {
-                // Extract the search query from the URL
-                const searchQuery = decodeURIComponent(url.split('?q=')[1]);
+        let lastError;
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                // Check if this is a Google search URL
+                if (url.includes('google.com/search?q=')) {
+                    // Extract the search query from the URL
+                    const searchQuery = decodeURIComponent(url.split('?q=')[1]);
 
-                console.log(`[BrowserController] Performing physical search with mouse/keyboard for: "${searchQuery.substring(0, 60)}..."`);
+                    console.log(`[BrowserController] Performing physical search with mouse/keyboard for: "${searchQuery.substring(0, 60)}..."`);
 
-                // First, navigate to Google homepage
-                await this.page.goto('https://www.google.com', {
-                    waitUntil: 'networkidle2',
-                    timeout: config.research.pageTimeout
-                });
-
-                await this.wait(1000);
-
-                // Find the search box and click it with mouse
-                const searchBox = await this.page.$('textarea[name="q"], input[name="q"]');
-
-                if (searchBox) {
-                    // Get the bounding box for mouse movement
-                    const box = await searchBox.boundingBox();
-
-                    if (box) {
-                        console.log('[BrowserController] Moving mouse to search box...');
-                        // Move mouse to search box (visible cursor movement)
-                        await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, {
-                            steps: 10 // Smooth mouse movement in 10 steps
-                        });
-
-                        // Click the search box
-                        console.log('[BrowserController] Clicking search box...');
-                        await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-                        await this.wait(500);
-                    }
-
-                    // Type the search query with keyboard (instant typing)
-                    console.log('[BrowserController] Typing search query with keyboard...');
-                    await this.page.keyboard.type(searchQuery); // No delay for instant typing
-
-                    await this.wait(500);
-
-                    // Press Enter to submit search
-                    console.log('[BrowserController] Pressing Enter to search...');
-                    await this.page.keyboard.press('Enter');
-
-                    // Wait for search results to load
-                    await this.page.waitForNavigation({
+                    // First, navigate to Google homepage
+                    await this.page.goto('https://www.google.com', {
                         waitUntil: 'networkidle2',
                         timeout: config.research.pageTimeout
                     });
 
-                    console.log('[BrowserController] Search results loaded!');
+                    await this.wait(1000);
+
+                    // Find the search box and click it with mouse
+                    const searchBox = await this.page.$('textarea[name="q"], input[name="q"]');
+
+                    if (searchBox) {
+                        // Get the bounding box for mouse movement
+                        const box = await searchBox.boundingBox();
+
+                        if (box) {
+                            console.log('[BrowserController] Moving mouse to search box...');
+                            // Move mouse to search box (visible cursor movement)
+                            await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, {
+                                steps: 10 // Smooth mouse movement in 10 steps
+                            });
+
+                            // Click the search box
+                            console.log('[BrowserController] Clicking search box...');
+                            await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+                            await this.wait(500);
+                        }
+
+                        // Type the search query with keyboard (instant typing)
+                        console.log('[BrowserController] Typing search query with keyboard...');
+                        await this.page.keyboard.type(searchQuery); // No delay for instant typing
+
+                        await this.wait(500);
+
+                        // Press Enter to submit search
+                        console.log('[BrowserController] Pressing Enter to search...');
+                        await this.page.keyboard.press('Enter');
+
+                        // Wait for search results to load
+                        await this.page.waitForNavigation({
+                            waitUntil: 'networkidle2',
+                            timeout: config.research.pageTimeout
+                        });
+
+                        console.log('[BrowserController] Search results loaded!');
+                    } else {
+                        // Fallback to direct navigation if search box not found
+                        console.log('[BrowserController] Search box not found, using direct navigation');
+                        await this.page.goto(url, {
+                            waitUntil: 'networkidle2',
+                            timeout: config.research.pageTimeout
+                        });
+                    }
                 } else {
-                    // Fallback to direct navigation if search box not found
-                    console.log('[BrowserController] Search box not found, using direct navigation');
+                    // For non-search URLs, navigate directly
                     await this.page.goto(url, {
                         waitUntil: 'networkidle2',
                         timeout: config.research.pageTimeout
                     });
                 }
-            } else {
-                // For non-search URLs, navigate directly
-                await this.page.goto(url, {
-                    waitUntil: 'networkidle2',
-                    timeout: config.research.pageTimeout
-                });
-            }
 
-            // Small delay to ensure page is fully rendered
-            await this.wait(1000);
-        } catch (error) {
-            console.error(`[BrowserController] Navigation failed: ${error.message}`);
-            throw error;
+                // Small delay to ensure page is fully rendered
+                await this.wait(1000);
+                
+                // Navigation successful
+                return;
+            } catch (error) {
+                lastError = error;
+                console.error(`[BrowserController] Navigation attempt ${attempt}/${retries} failed: ${error.message}`);
+                
+                if (attempt < retries) {
+                    console.log(`[BrowserController] Retrying navigation...`);
+                    await this.wait(2000);
+                } else {
+                    console.error(`[BrowserController] All navigation attempts failed`);
+                    throw error;
+                }
+            }
         }
+        
+        throw lastError;
     }
 
     /**
      * Extract text content from the current page
-     * @returns {Promise<string>} The page text content
+     * @returns {Promise<string>} The page text content, or empty string on error
      */
     async extractContent() {
         if (!this.page) {
@@ -149,13 +176,14 @@ class PuppeteerBrowserController {
             return content;
         } catch (error) {
             console.error('[BrowserController] Failed to extract content:', error.message);
+            // Return empty string instead of throwing to allow graceful continuation
             return '';
         }
     }
 
     /**
      * Extract links from the current page (search results)
-     * @returns {Promise<string[]>} Array of URLs
+     * @returns {Promise<string[]>} Array of URLs, or empty array on error
      */
     async extractLinks() {
         if (!this.page) {
@@ -199,12 +227,15 @@ class PuppeteerBrowserController {
             return links;
         } catch (error) {
             console.error('[BrowserController] Failed to extract links:', error.message);
+            // Return empty array instead of throwing to allow graceful continuation
             return [];
         }
     }
 
     /**
      * Scroll the page smoothly using mouse wheel
+     * Scrolls to middle of page for dynamic content loading
+     * @returns {Promise<void>}
      */
     async scrollPage() {
         if (!this.page) {
@@ -240,8 +271,8 @@ class PuppeteerBrowserController {
 
     /**
      * Click an element by selector using physical mouse click
-     * @param {string} selector - CSS selector
-     * @returns {Promise<boolean>} True if successful
+     * @param {string} selector - CSS selector for element to click
+     * @returns {Promise<boolean>} True if successful, false otherwise
      */
     async clickElement(selector) {
         if (!this.page) {
@@ -269,8 +300,8 @@ class PuppeteerBrowserController {
 
     /**
      * Click a link by its text content using physical mouse
-     * @param {string} text - Text to search for in links
-     * @returns {Promise<boolean>} True if successful
+     * @param {string} text - Text to search for in link elements
+     * @returns {Promise<boolean>} True if successful, false otherwise
      */
     async clickLinkByText(text) {
         if (!this.page) {
@@ -303,7 +334,8 @@ class PuppeteerBrowserController {
 
     /**
      * Extract clickable elements from the current page
-     * @returns {Promise<Array>} Array of clickable elements with text and URL
+     * Filters out navigation and irrelevant links
+     * @returns {Promise<Array<{text: string, url: string, type: string}>>} Array of clickable elements
      */
     async extractClickableElements() {
         if (!this.page) {
@@ -346,7 +378,8 @@ class PuppeteerBrowserController {
     }
 
     /**
-     * Close the browser
+     * Close the browser instance
+     * @returns {Promise<void>}
      */
     async close() {
         if (this.browser) {
@@ -359,6 +392,8 @@ class PuppeteerBrowserController {
 
     /**
      * Handle CAPTCHA challenges (e.g., "I'm not a robot")
+     * Attempts to detect and interact with reCAPTCHA
+     * @returns {Promise<boolean>} True if CAPTCHA was found and handled
      */
     async handleCaptcha() {
         try {

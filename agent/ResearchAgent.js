@@ -1,7 +1,18 @@
+/**
+ * Autonomous Research Agent
+ * Uses AI (Ollama) to plan and execute comprehensive web research
+ * using browser automation (Puppeteer)
+ */
+
 const OllamaService = require('./OllamaService');
 const config = require('../config');
 
 class ResearchAgent {
+    /**
+     * Create a new ResearchAgent instance
+     * @param {PuppeteerBrowserController} browserController - Browser controller instance
+     * @param {Function} statusCallback - Callback function for status updates
+     */
     constructor(browserController, statusCallback) {
         this.ollama = new OllamaService();
         this.browser = browserController;
@@ -11,6 +22,20 @@ class ResearchAgent {
         this.collectedInfo = [];
         // NEW: Global memory to track what we know to prevent redundancy
         this.knowledgeSummary = "";
+    }
+
+    /**
+     * Validate if a URL is well-formed
+     * @param {string} url - The URL to validate
+     * @returns {boolean} True if URL is valid
+     */
+    isValidUrl(url) {
+        try {
+            new URL(url);
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     /**
@@ -25,6 +50,7 @@ class ResearchAgent {
         this.collectedInfo = [];
         this.query = query;
         this.customInstructions = customInstructions;
+        this.startTime = Date.now();
 
         try {
             this.updateStatus('Initializing research agent...');
@@ -46,8 +72,15 @@ class ResearchAgent {
 
             this.updateStatus(`Executing research plan with ${plan.searches.length} search queries...`);
 
-            // Execute searches
+            // Execute searches with timeout protection
             for (let i = 0; i < plan.searches.length && this.isRunning; i++) {
+                // Check if we've exceeded max research time
+                if (Date.now() - this.startTime > config.research.maxResearchTime) {
+                    console.log('[Agent] Maximum research time exceeded, finishing early');
+                    this.updateStatus('Research time limit reached, generating report with collected data...', 'warning');
+                    break;
+                }
+
                 try {
                     const searchQuery = plan.searches[i];
                     // Pass the full directive as context
@@ -61,6 +94,19 @@ class ResearchAgent {
 
             if (!this.isRunning) {
                 return { cancelled: true };
+            }
+
+            // Check if we collected any meaningful information
+            if (this.collectedInfo.length === 0) {
+                this.updateStatus('No information collected. Research may have encountered issues.', 'warning');
+                return {
+                    query: this.query,
+                    timestamp: new Date().toISOString(),
+                    sourcesCount: 0,
+                    content: this.generateEmptyReport(),
+                    sources: [],
+                    warning: 'No information was collected during research'
+                };
             }
 
             this.updateStatus('Synthesizing findings into report...');
@@ -93,7 +139,10 @@ class ResearchAgent {
     }
 
     /**
-     * NEW: Enrich the user query into a detailed research directive
+     * Enrich the user query into a detailed research directive
+     * Uses AI to expand a simple query into comprehensive research goals
+     * @param {string} query - The original user query
+     * @returns {Promise<string>} Enriched research directive
      */
     async enrichQuery(query) {
         const customContext = this.customInstructions ? `\nUsers custom instructions: ${this.customInstructions}` : '';
@@ -120,6 +169,9 @@ Output a single paragraph comprehensively describing what the research agent sho
 
     /**
      * Plan the research strategy using Ollama
+     * Breaks down the research directive into specific search queries
+     * @param {string} directive - The research directive
+     * @returns {Promise<Object>} Research plan with array of search queries
      */
     async planResearch(directive) {
         const customContext = this.customInstructions ? `\nAdhere to these custom instructions: ${this.customInstructions}` : '';
@@ -144,10 +196,11 @@ Create a research plan. Respond with JSON in this exact format:
     }
 
     /**
-     * Perform a search and explore results
-     */
-    /**
-     * Perform a search and explore results
+     * Perform a search and explore results recursively
+     * @param {string} searchQuery - The search query to execute
+     * @param {number} depth - Current recursion depth
+     * @param {string} context - Research context for relevance scoring
+     * @returns {Promise<void>}
      */
     async performSearch(searchQuery, depth, context) {
         if (!this.isRunning || depth >= config.research.maxDepth) {
@@ -251,7 +304,11 @@ Create a research plan. Respond with JSON in this exact format:
     }
 
     /**
-     * Use Ollama to select most relevant links
+     * Use Ollama to select most relevant links from search results
+     * Filters links to avoid redundancy and maximize information gain
+     * @param {string[]} links - Array of URLs to evaluate
+     * @param {string} query - The search query for context
+     * @returns {Promise<string[]>} Selected relevant URLs
      */
     async selectRelevantLinks(links, query) {
         const customContext = this.customInstructions ? `\nAdhere to these custom instructions: ${this.customInstructions}` : '';
@@ -278,7 +335,10 @@ Respond with JSON containing the selected URLs. IMPORTANT: Only select URLs from
             console.log('[Agent] Ollama link selection result:', result);
             if (result.selectedUrls && result.selectedUrls.length > 0) {
                 // Filter out any hallucinated URLs that aren't in the original list
-                const validUrls = result.selectedUrls.filter(url => links.includes(url));
+                // Also validate URLs using utility method
+                const validUrls = result.selectedUrls.filter(url => 
+                    links.includes(url) && this.isValidUrl(url)
+                );
                 if (validUrls.length > 0) {
                     return validUrls;
                 }
@@ -294,6 +354,11 @@ Respond with JSON containing the selected URLs. IMPORTANT: Only select URLs from
 
     /**
      * Visit a page by clicking on its link physically (instead of direct navigation)
+     * Extracts content and explores deeper links if depth allows
+     * @param {string} url - The URL to visit
+     * @param {string} context - Research context
+     * @param {number} depth - Current recursion depth
+     * @returns {Promise<void>}
      */
     async visitPage(url, context, depth) {
         if (this.visitedUrls.has(url) || !this.isRunning) {
@@ -403,7 +468,11 @@ Respond with JSON containing the selected URLs. IMPORTANT: Only select URLs from
     }
 
     /**
-     * NEW: Explore clickable links within a page
+     * Explore clickable links within a page recursively
+     * @param {string} currentUrl - The current page URL
+     * @param {string} context - Research context
+     * @param {number} depth - Current recursion depth
+     * @returns {Promise<void>}
      */
     async explorePageLinks(currentUrl, context, depth) {
         try {
@@ -446,7 +515,10 @@ Respond with JSON containing the selected URLs. IMPORTANT: Only select URLs from
     }
 
     /**
-     * Use Ollama to select informative links from clickable elements
+     * Use Ollama to select informative links from clickable elements on a page
+     * @param {Array<{text: string, url: string}>} clickables - Array of clickable elements
+     * @param {string} query - The research query for context
+     * @returns {Promise<Array<{text: string, url: string}>>} Selected informative links
      */
     async selectInformativeLinks(clickables, query) {
         const customContext = this.customInstructions ? `\nAdhere to these custom instructions: ${this.customInstructions}` : '';
@@ -485,6 +557,9 @@ Respond with JSON containing the link texts and URLs:
 
     /**
      * Extract relevant information from page content using Ollama
+     * @param {string} content - Raw page content
+     * @param {string} context - Research context
+     * @returns {Promise<string>} Extracted relevant information
      */
     async extractRelevantInfo(content, context) {
         // Truncate content to avoid overwhelming the LLM
@@ -511,7 +586,10 @@ Respond with just the extracted information as plain text, one insight per line.
     }
 
     /**
-     * NEW: Update global knowledge memory to prevent redundancy
+     * Update global knowledge memory to prevent redundancy
+     * Merges new information into existing knowledge summary
+     * @param {string} newInfo - New information to integrate
+     * @returns {Promise<void>}
      */
     async updateKnowledgeMemory(newInfo) {
         try {
@@ -538,7 +616,9 @@ Respond ONLY with the updated memory text.`;
     }
 
     /**
-     * Generate final research report
+     * Generate final research report from collected information
+     * Uses AI to synthesize findings into a comprehensive report
+     * @returns {Promise<Object>} Research report object
      */
     async generateReport() {
         console.log(`[Agent] Generating report with ${this.collectedInfo.length} sources`);
@@ -594,29 +674,66 @@ Make it comprehensive but concise. Use proper Markdown formatting.`;
 
     /**
      * Generate a simple fallback report if Ollama fails
+     * @returns {string} Markdown formatted report
      */
     generateFallbackReport() {
         let report = `# Research Report: ${this.query}\n\n`;
-        report += `Generated: ${new Date().toLocaleString()}\n\n`;
-        report += `## Summary\n\nCollected information from ${this.collectedInfo.length} sources.\n\n`;
+        report += `**Generated:** ${new Date().toLocaleString()}\n`;
+        report += `**Status:** Generated using fallback formatter (AI synthesis unavailable)\n\n`;
+        report += `---\n\n`;
+        report += `## Executive Summary\n\n`;
+        report += `Collected information from ${this.collectedInfo.length} sources during automated web research.\n\n`;
         report += `## Findings\n\n`;
 
         this.collectedInfo.forEach((item, i) => {
-            report += `### Source ${i + 1}\n`;
-            report += `**URL:** ${item.url}\n\n`;
-            report += `**Information:**\n${item.information}\n\n`;
+            report += `### ${i + 1}. Information from Source\n\n`;
+            report += `**URL:** [${item.url}](${item.url})\n\n`;
+            report += `**Research Context:** ${item.context}\n\n`;
+            report += `**Extracted Information:**\n\n${item.information}\n\n`;
+            report += `---\n\n`;
         });
 
-        report += `## Sources\n\n`;
+        report += `## References\n\n`;
         this.collectedInfo.forEach((item, i) => {
-            report += `${i + 1}. [${item.url}](${item.url})\n`;
+            report += `[${i + 1}] ${item.url}\n\n`;
         });
+
+        report += `\n---\n\n`;
+        report += `*Report generated by Deep Research Agent on ${new Date().toLocaleString()}*\n`;
 
         return report;
     }
 
     /**
-     * Update status
+     * Generate an empty report when no information was collected
+     * @returns {string} Markdown formatted empty report
+     */
+    generateEmptyReport() {
+        let report = `# Research Report: ${this.query}\n\n`;
+        report += `**Generated:** ${new Date().toLocaleString()}\n`;
+        report += `**Status:** No information collected\n\n`;
+        report += `---\n\n`;
+        report += `## Issue\n\n`;
+        report += `The research agent was unable to collect information for this query. This may be due to:\n\n`;
+        report += `- Network connectivity issues\n`;
+        report += `- Search engine access problems\n`;
+        report += `- Query too specific or no results available\n`;
+        report += `- Time constraints\n\n`;
+        report += `## Suggestions\n\n`;
+        report += `1. Try rephrasing the query to be more general\n`;
+        report += `2. Check your network connection\n`;
+        report += `3. Ensure Ollama is running and accessible\n`;
+        report += `4. Try again with increased timeouts in config.js\n\n`;
+        report += `---\n\n`;
+        report += `*Report generated by Deep Research Agent on ${new Date().toLocaleString()}*\n`;
+
+        return report;
+    }
+
+    /**
+     * Update status and notify via callback
+     * @param {string} message - Status message
+     * @param {string} type - Status type ('info', 'error', 'warning', 'success')
      */
     updateStatus(message, type = 'info') {
         console.log(`[Agent] ${message}`);
@@ -626,7 +743,9 @@ Make it comprehensive but concise. Use proper Markdown formatting.`;
     }
 
     /**
-     * Wait helper
+     * Wait helper utility
+     * @param {number} ms - Milliseconds to wait
+     * @returns {Promise<void>}
      */
     wait(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
