@@ -217,6 +217,15 @@ async function main() {
 
         if (report.cancelled) {
             console.log(chalk.yellow('\n⚠️  Research was cancelled.'));
+        } else if (report.warning) {
+            // Display warning for empty or problematic reports
+            console.log(chalk.yellow(`\n⚠️  Warning: ${report.warning}\n`));
+            
+            // Display summary even for empty reports
+            displayReportSummary(report);
+
+            // Save report
+            saveReport(report);
         } else {
             // Display summary
             displayReportSummary(report);
